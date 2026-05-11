@@ -1,0 +1,279 @@
+import { useState, useEffect } from "react";
+import { ShieldCheck, Calendar, Clock, MapPin, Loader2, AlertCircle } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
+import { collection, doc, setDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { cn } from "@/src/lib/utils";
+
+type BookingData = {
+  fullName: string;
+  phone: string;
+  email: string;
+  service: string;
+  preferredTime: string;
+  preferredDate: string;
+};
+
+const TIME_SLOTS = [
+  "08:00", "09:00", "10:00", "11:00", "12:00", 
+  "13:00", "14:00", "15:00", "16:00", "17:00"
+];
+
+export default function Booking() {
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BookingData>();
+  
+  const selectedDate = watch("preferredDate");
+  const selectedTime = watch("preferredTime");
+
+  const services = [
+    "Vitamin & Mineral Booster (R940)",
+    "Detox (R1,300)",
+    "Immune Booster (R1,300)",
+    "Anti-Ageing (R1,300)",
+    "Gut Health (R1,450)",
+    "Weight Loss (R1,200)",
+    "Mood & Brain Booster (R1,300)",
+    "Fertility (R980)",
+    "NAD Therapy (R2,000)"
+  ];
+
+  const checkAvailability = async (date: string) => {
+    if (!date) return;
+    setLoadingAvailability(true);
+    try {
+      const q = query(
+        collection(db, "availability"), 
+        where("date", "==", date)
+      );
+      const querySnapshot = await getDocs(q);
+      const booked = querySnapshot.docs.map(doc => doc.data().time);
+      setBookedSlots(booked);
+    } catch (error) {
+      console.error("Error checking availability:", error);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      checkAvailability(selectedDate);
+      // Reset time selection when date changes
+      if (!bookedSlots.includes(selectedTime)) {
+        // keep it if it's still available or reset if not? 
+        // usually safer to just check if the current time is now booked
+      }
+    }
+  }, [selectedDate]);
+
+  const onSubmit = async (data: BookingData) => {
+    if (bookedSlots.includes(data.preferredTime)) {
+      setSubmitError("Sorry, this time slot was just taken. Please choose another.");
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const bookingRef = doc(collection(db, "bookings"));
+      await setDoc(bookingRef, {
+        ...data,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+
+      setSubmitted(true);
+      window.scrollTo(0, 0);
+    } catch (error) {
+      setSubmitError("Failed to request appointment. Please try again or call us.");
+      handleFirestoreError(error, OperationType.WRITE, "bookings");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="pt-20 min-h-screen flex items-center justify-center bg-brand-grey/30">
+        <div className="max-w-xl w-full px-4 text-center">
+          <div className="w-20 h-20 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl">
+            <ShieldCheck className="w-10 h-10" />
+          </div>
+          <h1 className="text-4xl font-serif mb-6">Booking Request Received</h1>
+          <p className="text-gray-500 text-lg mb-8 leading-relaxed">
+            Thank you for choosing LALOKHUMED. A medical professional will contact you shortly to confirm your appointment and review your intake details.
+          </p>
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-8">
+            <p className="text-sm font-bold text-brand-red uppercase tracking-widest mb-4">Important Next Step</p>
+            <p className="text-brand-text mb-6">All treatments require a completed Patient Questionnaire before the appointment.</p>
+            <a href="/questionnaire" className="inline-block bg-brand-red text-white py-4 px-10 rounded-full font-bold hover:bg-brand-red-dark transition-all">
+              Complete Questionnaire Now
+            </a>
+          </div>
+          <a href="/" className="text-gray-400 hover:text-brand-text transition-colors">Return to Homepage</a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-20 min-h-screen bg-brand-grey/30 pb-20">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
+          <div>
+            <h1 className="text-5xl md:text-7xl font-serif text-brand-text mb-8 leading-tight">
+              Book Your <span className="text-brand-red italic">Wellness Session</span>.
+            </h1>
+            <p className="text-xl text-gray-500 mb-12 leading-relaxed">
+              Select your preferred treatment and schedule a time. Please note that all treatments are subject to final medical review for your safety.
+            </p>
+
+            <div className="space-y-8">
+               <div className="flex gap-6">
+                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-brand-red shadow-sm shrink-0"><Calendar /></div>
+                 <div>
+                   <p className="font-bold text-brand-text">Flexible Scheduling</p>
+                   <p className="text-gray-500 text-sm">We offer morning and afternoon slots throughout the week.</p>
+                 </div>
+               </div>
+               <div className="flex gap-6">
+                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-brand-red shadow-sm shrink-0"><MapPin /></div>
+                 <div>
+                   <p className="font-bold text-brand-text">Central Location</p>
+                   <p className="text-gray-500 text-sm">273 Bryanston Drive, Sandton. Secure parking available.</p>
+                 </div>
+               </div>
+               <div className="flex gap-6">
+                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-brand-red shadow-sm shrink-0"><ShieldCheck /></div>
+                 <div>
+                   <p className="font-bold text-brand-text">Doctor Supervised</p>
+                   <p className="text-gray-500 text-sm">Safe, professional, and clinical environment for all drip procedures.</p>
+                 </div>
+               </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-10 md:p-12 rounded-[3.5rem] shadow-2xl border border-gray-100">
+            <h2 className="text-3xl font-serif mb-8">Appointment Details</h2>
+            
+            {submitError && (
+              <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center gap-3 mb-8 border border-red-100">
+                <AlertCircle className="w-5 h-5" />
+                <p className="text-sm font-bold">{submitError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">Full Name</label>
+                  <input {...register("fullName", { required: true })} className={`w-full bg-brand-grey border-none rounded-2xl p-4 focus:ring-2 focus:ring-brand-red outline-none transition-all ${errors.fullName ? 'ring-2 ring-red-200' : ''}`} placeholder="John Doe" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700 ml-1">Phone Number</label>
+                  <input {...register("phone", { required: true })} className={`w-full bg-brand-grey border-none rounded-2xl p-4 focus:ring-2 focus:ring-brand-red outline-none transition-all ${errors.phone ? 'ring-2 ring-red-200' : ''}`} placeholder="+27 00 000 0000" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 ml-1">Email Address</label>
+                <input {...register("email", { required: true })} className={`w-full bg-brand-grey border-none rounded-2xl p-4 focus:ring-2 focus:ring-brand-red outline-none transition-all ${errors.email ? 'ring-2 ring-red-200' : ''}`} placeholder="john@example.com" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 ml-1">Select Service</label>
+                <select {...register("service", { required: true })} className={`w-full bg-brand-grey border-none rounded-2xl p-4 focus:ring-2 focus:ring-brand-red outline-none transition-all appearance-none ${errors.service ? 'ring-2 ring-red-200' : ''}`}>
+                  <option value="">Select a treatment...</option>
+                  {services.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-gray-700 ml-1 flex items-center gap-2 italic">
+                  <Calendar className="w-3 h-3" /> Preferred Date
+                </label>
+                <input 
+                  type="date" 
+                  min={new Date().toISOString().split('T')[0]}
+                  {...register("preferredDate", { required: true })} 
+                  className={`w-full bg-brand-grey border-none rounded-2xl p-4 focus:ring-2 focus:ring-brand-red outline-none transition-all ${errors.preferredDate ? 'ring-2 ring-red-200' : ''}`} 
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-gray-700 ml-1 flex items-center gap-2 italic">
+                  <Clock className="w-3 h-3" /> Preferred Time Slot
+                </label>
+                
+                {!selectedDate ? (
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center text-sm text-gray-400">
+                    Please select a date first to see available times.
+                  </div>
+                ) : loadingAvailability ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-6 h-6 text-brand-red animate-spin" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    {TIME_SLOTS.map((time) => {
+                      const isBooked = bookedSlots.includes(time);
+                      const isSelected = selectedTime === time;
+                      
+                      return (
+                        <button
+                          key={time}
+                          type="button"
+                          disabled={isBooked}
+                          onClick={() => setValue("preferredTime", time, { shouldValidate: true })}
+                          className={cn(
+                            "py-3 px-2 rounded-xl text-sm font-bold transition-all border",
+                            isBooked 
+                              ? "bg-gray-100 text-gray-300 border-gray-100 cursor-not-allowed line-through" 
+                              : isSelected
+                                ? "bg-brand-red text-white border-brand-red shadow-lg shadow-brand-red/20 scale-[1.02]"
+                                : "bg-brand-grey border-transparent text-gray-600 hover:border-brand-red/30"
+                          )}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {errors.preferredTime && <p className="text-xs text-red-500 ml-1">Please select a time slot.</p>}
+                {/* Hidden input for react-hook-form to register against the custom buttons */}
+                <input type="hidden" {...register("preferredTime", { required: true })} />
+              </div>
+
+              <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100 flex gap-4 mt-8">
+                <ShieldCheck className="w-6 h-6 text-yellow-600 shrink-0" />
+                <p className="text-xs text-yellow-800 leading-relaxed font-medium">
+                  NOTICE: All treatments are subject to medical review. You will be asked to complete a health questionnaire before your appointment.
+                </p>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full bg-brand-red text-white py-5 rounded-[2rem] font-bold text-lg shadow-xl hover:bg-brand-red-dark transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : "Request Appointment"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
