@@ -94,6 +94,17 @@ export default function Admin() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ show: boolean, id: string | null }>({ show: false, id: null });
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (successMsg || actionError) {
+      const timer = setTimeout(() => {
+        setSuccessMsg(null);
+        setActionError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMsg, actionError]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -240,21 +251,30 @@ export default function Admin() {
   const deleteBooking = async (id: string) => {
     setIsDeleting(id);
     setActionError(null);
+    setSuccessMsg(null);
+    
+    console.log(`Starting deletion for booking ID: ${id}`);
+    
     try {
       // 1. Delete booking document
       await deleteDoc(doc(db, "bookings", id));
+      console.log("Booking document deleted successfully");
       
       // 2. Clear availability
       await deleteDoc(doc(db, "availability", id));
+      console.log("Availability record cleared successfully");
       
       // 3. Update local state
       setBookings(prev => prev.filter(b => b.id !== id));
       if (selectedItem?.id === id) setSelectedItem(null);
+      
+      setSuccessMsg("Booking permanently deleted and time slot released.");
       setShowDeleteConfirm({ show: false, id: null });
       
     } catch (error: any) {
-      console.error("Delete Error:", error);
-      setActionError(error.message || "Failed to delete booking. Check your connection or permissions.");
+      console.error("Delete Error details:", error);
+      const msg = error?.message || "Failed to delete from database.";
+      setActionError(`Delete failed: ${msg}. Check if you have proper admin permissions.`);
     } finally {
       setIsDeleting(null);
     }
@@ -426,12 +446,22 @@ export default function Admin() {
 
         {/* Stats & Controls */}
         {actionError && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 flex items-center justify-between border border-red-100">
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 flex items-center justify-between border border-red-100 shadow-sm animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5" />
               <p className="text-sm font-bold">{actionError}</p>
             </div>
             <button onClick={() => setActionError(null)} className="text-xs font-bold uppercase tracking-widest hover:underline">Dismiss</button>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="bg-green-50 text-green-600 p-4 rounded-2xl mb-6 flex items-center justify-between border border-green-100 shadow-sm animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-5 h-5" />
+              <p className="text-sm font-bold">{successMsg}</p>
+            </div>
+            <button onClick={() => setSuccessMsg(null)} className="text-xs font-bold uppercase tracking-widest hover:underline">Dismiss</button>
           </div>
         )}
 

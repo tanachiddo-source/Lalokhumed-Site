@@ -240,10 +240,18 @@ export default function Questionnaire() {
 
       // Send email alert
       try {
+        // Create a clean copy of data without Firestore objects for the email notification
+        const emailData = {
+          fullName: data.fullName,
+          email: data.email,
+          phone: data.phone,
+          formCategory: questionnaireData.formCategory
+        };
+
         await fetch("/api/send-alert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "questionnaire", data: questionnaireData })
+          body: JSON.stringify({ type: "questionnaire", data: emailData })
         });
       } catch (err) {
         console.error("Notification failed", err);

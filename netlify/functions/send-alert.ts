@@ -7,18 +7,20 @@ const handler: Handler = async (event, context) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  const adminEmail = process.env.ADMIN_EMAIL || "tanachiddo@gmail.com";
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const adminEmail = process.env.ADMIN_EMAIL || "tanachiddo@gmail.com";
 
-  if (!resendApiKey) {
-    console.error("RESEND_API_KEY environment variable is missing.");
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Server Configuration Error: API Key missing" }),
-    };
-  }
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY environment variable is missing.");
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Server Configuration Error: API Key missing" }),
+      };
+    }
 
-  const resend = new Resend(resendApiKey);
+    console.log(`Resend configuration: Using onboarding@resend.dev. Ensure ${adminEmail} is the email address used to sign up for Resend.`);
+    
+    const resend = new Resend(resendApiKey);
 
   try {
     const { type, data } = JSON.parse(event.body || "{}");
@@ -59,11 +61,11 @@ const handler: Handler = async (event, context) => {
       `;
     }
 
-    console.log(`Attempting to send email to ${adminEmail} for ${type}...`);
+    console.log(`Email details: Type=${type}, To=${adminEmail}`);
     
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: "Lalokhumed Alerts <onboarding@resend.dev>",
-      to: [adminEmail],
+      to: adminEmail,
       subject: subject,
       html: html,
     });

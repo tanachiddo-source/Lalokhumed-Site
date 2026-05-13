@@ -100,6 +100,7 @@ export default function Booking() {
 
       // Send email alert
       try {
+        // Use raw data to avoid serverTimestamp() etc.
         await fetch("/api/send-alert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
