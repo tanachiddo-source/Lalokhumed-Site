@@ -37,7 +37,8 @@ import {
   Lock,
   User as UserIcon,
   Stethoscope,
-  Activity
+  Activity,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
@@ -90,6 +91,9 @@ export default function Admin() {
   }>({ show: false, type: 'confirm', booking: null });
   const [customMsg, setCustomMsg] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ show: boolean, id: string | null }>({ show: false, id: null });
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -233,6 +237,29 @@ export default function Admin() {
     }
   };
 
+  const deleteBooking = async (id: string) => {
+    setIsDeleting(id);
+    setActionError(null);
+    try {
+      // 1. Delete booking document
+      await deleteDoc(doc(db, "bookings", id));
+      
+      // 2. Clear availability
+      await deleteDoc(doc(db, "availability", id));
+      
+      // 3. Update local state
+      setBookings(prev => prev.filter(b => b.id !== id));
+      if (selectedItem?.id === id) setSelectedItem(null);
+      setShowDeleteConfirm({ show: false, id: null });
+      
+    } catch (error: any) {
+      console.error("Delete Error:", error);
+      setActionError(error.message || "Failed to delete booking. Check your connection or permissions.");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   const exportToCSV = () => {
     const data = filteredData;
     if (data.length === 0) return;
@@ -327,9 +354,21 @@ export default function Admin() {
           </p>
 
           {loginError && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-sm flex items-start gap-3 border border-red-100 text-left">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <p>{loginError}</p>
+            <div className="bg-red-50 text-red-600 p-6 rounded-2xl mb-6 text-sm flex flex-col gap-4 border border-red-100 text-left">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <p className="font-bold">Authentication Error</p>
+              </div>
+              <p className="text-xs leading-relaxed">{loginError}</p>
+              <div className="bg-white/50 p-3 rounded-xl border border-red-200/50">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400 mb-1">Current Domain to Authorize:</p>
+                <code className="text-[10px] block break-all bg-gray-100 p-2 rounded-lg select-all">
+                  {window.location.hostname}
+                </code>
+              </div>
+              <p className="text-[10px] text-gray-400">
+                To fix: Go to Firebase Console &gt; Auth &gt; Settings &gt; Authorized Domains &gt; Add Domain.
+              </p>
             </div>
           )}
           
@@ -386,6 +425,16 @@ export default function Admin() {
         </div>
 
         {/* Stats & Controls */}
+        {actionError && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 flex items-center justify-between border border-red-100">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm font-bold">{actionError}</p>
+            </div>
+            <button onClick={() => setActionError(null)} className="text-xs font-bold uppercase tracking-widest hover:underline">Dismiss</button>
+          </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-6 mb-8 items-end">
           <div className="grid grid-cols-2 gap-2 w-full lg:w-[400px] shrink-0">
             <button 
@@ -527,12 +576,28 @@ export default function Admin() {
                       )}
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <button 
-                        onClick={() => setSelectedItem(item)}
-                        className="p-2 text-gray-400 hover:text-brand-red hover:bg-brand-red/5 rounded-full transition-all"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => setSelectedItem(item)}
+                          className="p-2 text-gray-400 hover:text-brand-red hover:bg-brand-red/5 rounded-full transition-all"
+                          title="View Details"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        {activeTab === 'bookings' && (
+                          <button 
+                            onClick={() => setShowDeleteConfirm({ show: true, id: item.id })}
+                            disabled={isDeleting === item.id}
+                            className={cn(
+                              "p-2 rounded-full transition-all",
+                              isDeleting === item.id ? "text-gray-300 animate-pulse" : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            )}
+                            title="Delete Booking"
+                          >
+                            {isDeleting === item.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -591,6 +656,13 @@ export default function Admin() {
                           className="flex items-center gap-2 bg-red-50 text-red-600 px-5 py-2.5 rounded-full text-xs font-bold hover:bg-red-100 transition-all border border-red-100"
                         >
                           <XCircle className="w-4 h-4" /> Decline
+                        </button>
+                        <button 
+                          onClick={() => setShowDeleteConfirm({ show: true, id: selectedItem.id })}
+                          disabled={!!isDeleting}
+                          className="flex items-center gap-2 bg-gray-50 text-gray-400 px-5 py-2.5 rounded-full text-xs font-bold hover:text-red-600 hover:bg-red-50 transition-all border border-gray-100 disabled:opacity-50"
+                        >
+                          {isDeleting === selectedItem.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
                         </button>
                       </div>
                     )}
@@ -833,6 +905,50 @@ export default function Admin() {
                       )}
                     </button>
                   </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+        {/* Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm.show && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isDeleting && setShowDeleteConfirm({ show: false, id: null })}
+                className="absolute inset-0 bg-brand-text/80 backdrop-blur-sm"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden p-8 text-center"
+              >
+                <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-serif mb-4">Delete Booking?</h3>
+                <p className="text-gray-500 mb-8 leading-relaxed text-sm">
+                  This action is permanent. It will delete the patient record and immediately release the reserved time slot for other patients.
+                </p>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setShowDeleteConfirm({ show: false, id: null })}
+                    disabled={!!isDeleting}
+                    className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-bold hover:bg-gray-200 transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => showDeleteConfirm.id && deleteBooking(showDeleteConfirm.id)}
+                    disabled={!!isDeleting}
+                    className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Delete Now"}
+                  </button>
                 </div>
               </motion.div>
             </div>

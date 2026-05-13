@@ -6,8 +6,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -19,11 +17,14 @@ async function startServer() {
     try {
       const { type, data } = req.body;
       const adminEmail = process.env.ADMIN_EMAIL || "tanachiddo@gmail.com";
+      const resendApiKey = process.env.RESEND_API_KEY;
 
-      if (!process.env.RESEND_API_KEY) {
+      if (!resendApiKey) {
         console.warn("RESEND_API_KEY is missing. Skipping email.");
         return res.status(200).json({ status: "skipped", message: "API key missing" });
       }
+
+      const resend = new Resend(resendApiKey);
 
       let subject = "";
       let html = "";
@@ -56,7 +57,7 @@ async function startServer() {
       }
 
       const info = await resend.emails.send({
-        from: "Lalokhumed Alerts <notifications@resend.dev>",
+        from: "Lalokhumed Alerts <onboarding@resend.dev>",
         to: adminEmail,
         subject: subject,
         html: html,

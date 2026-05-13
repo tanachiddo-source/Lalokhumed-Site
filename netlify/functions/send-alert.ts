@@ -1,24 +1,30 @@
 import { Handler } from "@netlify/functions";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const handler: Handler = async (event, context) => {
   // Only allow POST
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const adminEmail = process.env.ADMIN_EMAIL || "tanachiddo@gmail.com";
+
+  if (!resendApiKey) {
+    console.error("RESEND_API_KEY environment variable is missing.");
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Server Configuration Error: API Key missing" }),
+    };
+  }
+
+  const resend = new Resend(resendApiKey);
+
   try {
     const { type, data } = JSON.parse(event.body || "{}");
-    const adminEmail = process.env.ADMIN_EMAIL || "tanachiddo@gmail.com";
 
-    if (!process.env.RESEND_API_KEY) {
-      console.warn("RESEND_API_KEY is missing. Skipping email.");
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ status: "skipped", message: "API key missing" }),
-      };
+    if (!type || !data) {
+      return { statusCode: 400, body: "Bad Request: Missing type or data" };
     }
 
     let subject = "";
@@ -53,22 +59,34 @@ const handler: Handler = async (event, context) => {
       `;
     }
 
-    const info = await resend.emails.send({
-      from: "Lalokhumed Alerts <notifications@resend.dev>",
-      to: adminEmail,
+    console.log(`Attempting to send email to ${adminEmail} for ${type}...`);
+    
+    const { data: resendData, error: resendError } = await resend.emails.send({
+      from: "Lalokhumed Alerts <onboarding@resend.dev>",
+      to: [adminEmail],
       subject: subject,
       html: html,
     });
 
+    if (resendError) {
+      console.error("Resend API Error:", resendError);
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: resendError.message, details: resendError }),
+      };
+    }
+
+    console.log("Email sent successfully:", resendData);
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, info }),
+      body: JSON.stringify({ success: true, id: resendData?.id }),
     };
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Function Execution Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Failed to send email" }),
+      body: JSON.stringify({ error: "Internal Server Error", message: error instanceof Error ? error.message : String(error) }),
     };
   }
 };

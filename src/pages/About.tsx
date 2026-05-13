@@ -31,7 +31,7 @@ export default function About() {
             <div className="relative">
               <div className="aspect-[4/3] rounded-[3rem] overflow-hidden shadow-2xl">
                 <img 
-                  src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/bd25a7400761c0a21df28ce155dcd56f56b8372b/1AA8C4D2-994C-4E8D-921D-6311E72AD0EB.png" 
+                  src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/About%20IV.png" 
                   alt="Medical Professional" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"

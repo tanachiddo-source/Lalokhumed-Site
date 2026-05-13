@@ -5,12 +5,15 @@ import { useState, useEffect } from "react";
 import { SEO } from "../components/Layout";
 
 const heroImages = [
-  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/bd25a7400761c0a21df28ce155dcd56f56b8372b/0D3A6695-F3E2-4AD0-99FE-7F5C59AD67B0.png",
-  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/bd25a7400761c0a21df28ce155dcd56f56b8372b/40FD0334-96C5-4577-9298-7D534723BD85.png",
-  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/bd25a7400761c0a21df28ce155dcd56f56b8372b/EFFA2E04-11C0-4DCC-BCAE-AA5059C50BED.png",
-  "https://images.unsplash.com/photo-1519494140221-d41fd927a95b?auto=format&fit=crop&q=80&w=2000",
-  "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=2000"
+  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Home%20Slide%201.png",
+  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Home%20slide%202.png",
+  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Home%20Slide%203.png",
+  "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Home%20Slide%204.png"
 ];
+
+const homeImages = {
+  "whyTrust": "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Home%20Section%201.png"
+};
 
 export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -234,7 +237,7 @@ export default function Home() {
             <div className="relative">
               <div className="aspect-square rounded-[3rem] overflow-hidden border-8 border-white/5">
                 <img 
-                  src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/79881388733169bcf97223579ed74ba5f31c93a6/ChatGPT%20Image%20May%2013%2C%202026%2C%2001_58_26%20AM.png" 
+                  src={homeImages.whyTrust} 
                   alt="Professional Healthcare" 
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"

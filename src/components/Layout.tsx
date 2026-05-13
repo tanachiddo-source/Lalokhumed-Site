@@ -29,7 +29,7 @@ export function SEO({
     "@context": "https://schema.org",
     "@type": "MedicalBusiness",
     "name": "LALOKHUMED",
-    "image": "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png",
+    "image": "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Logo%202%20Transparent.png",
     "@id": "https://lalokhumed.co.za",
     "url": "https://lalokhumed.co.za",
     "telephone": "+27678853687",
@@ -141,7 +141,7 @@ export function Navbar() {
           <Link to="/" className="flex items-center group">
             <div className="h-12 md:h-16 group-hover:scale-105 transition-transform duration-300">
               <img 
-                src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png" 
+                src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Logo%202%20Transparent.png" 
                 alt="Lalokhumed Logo" 
                 className="h-full w-auto object-contain"
                 referrerPolicy="no-referrer"
@@ -271,7 +271,7 @@ export function Footer() {
              <Link to="/" className="flex items-center group mb-6">
                 <div className="h-16 group-hover:scale-105 transition-transform duration-300">
                   <img 
-                    src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png" 
+                    src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/1ac8e0e4e7f134818ec974e0a9c02b23fb2ff104/public/Logo%202%20Transparent.png" 
                     alt="Lalokhumed Logo" 
                     className="h-full w-auto object-contain"
                     referrerPolicy="no-referrer"
