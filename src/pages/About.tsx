@@ -1,9 +1,14 @@
 import { motion } from "motion/react";
 import { ShieldCheck, Heart, UserCheck, Award, MapPin, Phone, Mail, Brain } from "lucide-react";
+import { SEO } from "../components/Layout";
 
 export default function About() {
   return (
     <div className="pt-20">
+      <SEO 
+        title="About LALOKHUMED | Doctor-Led Wellness in Bryanston" 
+        description="Learn about our patient-focused medical practice. LALOKHUMED provides personalised intravenous therapy with medical integrity in Sandton."
+      />
       {/* Header */}
       <section className="py-24 bg-brand-grey/50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
@@ -26,9 +31,10 @@ export default function About() {
             <div className="relative">
               <div className="aspect-[4/3] rounded-[3rem] overflow-hidden shadow-2xl">
                 <img 
-                  src="https://images.unsplash.com/photo-1559839734-2b71f153285e?auto=format&fit=crop&q=80&w=1000" 
+                  src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/bd25a7400761c0a21df28ce155dcd56f56b8372b/1AA8C4D2-994C-4E8D-921D-6311E72AD0EB.png" 
                   alt="Medical Professional" 
                   className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="absolute -bottom-10 -right-10 bg-brand-red text-white p-12 rounded-[3rem] hidden md:block">

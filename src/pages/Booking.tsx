@@ -28,6 +28,14 @@ export default function Booking() {
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BookingData>();
   
+  // Clear submit error when any field changes
+  useEffect(() => {
+    const subscription = watch(() => {
+      if (submitError) setSubmitError(null);
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, submitError]);
+
   const selectedDate = watch("preferredDate");
   const selectedTime = watch("preferredTime");
 
@@ -82,11 +90,23 @@ export default function Booking() {
 
     try {
       const bookingRef = doc(collection(db, "bookings"));
-      await setDoc(bookingRef, {
+      const bookingData = {
         ...data,
         status: 'pending',
         createdAt: serverTimestamp(),
-      });
+      };
+      await setDoc(bookingRef, bookingData);
+
+      // Send email alert
+      try {
+        await fetch("/api/send-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "booking", data })
+        });
+      } catch (err) {
+        console.error("Notification failed", err);
+      }
 
       setSubmitted(true);
       window.scrollTo(0, 0);
@@ -95,6 +115,29 @@ export default function Booking() {
       handleFirestoreError(error, OperationType.WRITE, "bookings");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onInvalid = (errors: any) => {
+    const firstErrorKey = Object.keys(errors)[0];
+    if (firstErrorKey) {
+      const fieldLabels: Record<string, string> = {
+        fullName: "Full Name",
+        phone: "Phone Number",
+        email: "Email Address",
+        service: "Select Service",
+        preferredDate: "Preferred Date",
+        preferredTime: "Preferred Time Slot"
+      };
+      const label = fieldLabels[firstErrorKey as keyof typeof fieldLabels] || firstErrorKey;
+      setSubmitError(`Missing required field: ${label}. Please complete all marked fields.`);
+      
+      const element = document.getElementsByName(firstErrorKey)[0];
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      setSubmitError("Please fill in all required fields marked with * before submitting.");
     }
   };
 
@@ -169,7 +212,7 @@ export default function Booking() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 ml-1">Full Name</label>

@@ -47,18 +47,22 @@ function AnimatedRoutes() {
   );
 }
 
+import { HelmetProvider } from "react-helmet-async";
+
 export default function App() {
   return (
-    <Router>
-      <div className="flex flex-col min-h-screen">
-        <ScrollToTop />
-        <Navbar />
-        <main className="flex-grow">
-          <AnimatedRoutes />
-        </main>
-        <Footer />
-        <StickyCTA />
-      </div>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <div className="flex flex-col min-h-screen">
+          <ScrollToTop />
+          <Navbar />
+          <main className="flex-grow">
+            <AnimatedRoutes />
+          </main>
+          <Footer />
+          <StickyCTA />
+        </div>
+      </Router>
+    </HelmetProvider>
   );
 }

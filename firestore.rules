@@ -16,9 +16,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // THE ADMIN EMAIL: Update 'tanachiddo@gmail.com' to your business email when ready.
+      let masterAdminEmail = 'tanachiddo@gmail.com';
+      
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'tanachiddo@gmail.com'
+        request.auth.token.email == masterAdminEmail
       );
     }
 
@@ -70,7 +73,7 @@ service cloud.firestore {
       function isValidQuestionnaire(data) {
         return (data.get('fullName', '') is string) && (data.get('fullName', '').size() <= 200) &&
                (data.get('email', '') is string) && (data.get('email', '').size() <= 200) &&
-               (data.get('signature', '') is string) && (data.get('signature', '').size() <= 200);
+               (data.get('signature', '') is string) && (data.get('signature', '').size() <= 500000);
       }
 
       // Public can submit

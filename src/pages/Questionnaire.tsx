@@ -1,6 +1,7 @@
-import { useForm } from "react-hook-form";
-import { ShieldCheck, HeartPulse, Stethoscope, User, AlertCircle, CheckCircle2, Loader2, ClipboardList, Briefcase, Activity, Calendar } from "lucide-react";
-import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { ShieldCheck, HeartPulse, Stethoscope, User, AlertCircle, CheckCircle2, Loader2, ClipboardList, Briefcase, Activity, Calendar, Eraser, PenTool } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import SignaturePad from "signature_pad";
 import { cn } from "@/src/lib/utils";
 import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
 import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -10,9 +11,11 @@ type IVQuestionnaireData = {
   dob: string;
   phone: string;
   email: string;
-  emergencyContact: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
   medicalConditions: string;
-  conditionsList?: string;
+  medicalConditionsSelected?: string[];
+  medicalConditionsOther?: string;
   medications: string;
   medicationsList?: string;
   allergies: string;
@@ -32,7 +35,7 @@ type IVQuestionnaireData = {
   waterIntake: string;
   previousIv: string;
   consent: boolean;
-  signature: string;
+  signature: string; // Base64 string from canvas
   date: string;
   formType: "IV Therapy";
 };
@@ -56,16 +59,32 @@ type GeneralIntakeData = {
 
 type FormState = 'selection' | 'iv' | 'general';
 
+const MEDICAL_CONDITIONS_OPTIONS = [
+  "Asthma",
+  "Kidney disease",
+  "Congestive heart failure",
+  "Hypertension",
+  "Diabetes",
+  "Cancer",
+  "G6PD deficiency"
+];
+
 export default function Questionnaire() {
   const [formType, setFormType] = useState<FormState>('selection');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  
+  const ivCanvasRef = useRef<HTMLCanvasElement>(null);
+  const generalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const ivSignatureRef = useRef<SignaturePad | null>(null);
+  const generalSignatureRef = useRef<SignaturePad | null>(null);
 
   const ivForm = useForm<IVQuestionnaireData>({
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
-      formType: "IV Therapy"
+      formType: "IV Therapy",
+      medicalConditionsSelected: []
     }
   });
 
@@ -76,6 +95,20 @@ export default function Questionnaire() {
     }
   });
 
+  // Clear submit error when any field changes
+  useEffect(() => {
+    const ivory = ivForm.watch(() => {
+      if (submitError) setSubmitError(null);
+    });
+    const general = generalForm.watch(() => {
+      if (submitError) setSubmitError(null);
+    });
+    return () => {
+      ivory.unsubscribe();
+      general.unsubscribe();
+    };
+  }, [ivForm, generalForm, submitError]);
+
   const watchIV = {
     medicalConditions: ivForm.watch("medicalConditions"),
     medications: ivForm.watch("medications"),
@@ -83,20 +116,138 @@ export default function Questionnaire() {
     adverseReactions: ivForm.watch("adverseReactions"),
     medicalDevices: ivForm.watch("medicalDevices"),
     pregnancy: ivForm.watch("pregnancy"),
-    smoke: ivForm.watch("smoke")
+    smoke: ivForm.watch("smoke"),
+    previousIv: ivForm.watch("previousIv")
+  };
+
+  // Initialize signature pads
+  useEffect(() => {
+    const resizeCanvas = (canvas: HTMLCanvasElement, padRef: React.MutableRefObject<SignaturePad | null>) => {
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+      
+      // Only resize if dimensions actually changed to avoid unnecessary clears
+      if (canvas.width !== width * ratio || canvas.height !== height * ratio) {
+        canvas.width = width * ratio;
+        canvas.height = height * ratio;
+        canvas.getContext("2d")?.scale(ratio, ratio);
+        padRef.current?.clear(); // Resizing clears the canvas, so we clear the pad state too
+      }
+    };
+
+    const initPad = () => {
+      if (formType === 'iv' && ivCanvasRef.current) {
+        if (!ivSignatureRef.current) {
+          ivSignatureRef.current = new SignaturePad(ivCanvasRef.current, {
+            penColor: "#8B0000"
+          });
+          ivSignatureRef.current.addEventListener("endStroke", () => {
+            handleEndSignature('iv');
+          });
+        }
+        resizeCanvas(ivCanvasRef.current, ivSignatureRef);
+      } else if (formType === 'general' && generalCanvasRef.current) {
+        if (!generalSignatureRef.current) {
+          generalSignatureRef.current = new SignaturePad(generalCanvasRef.current, {
+            penColor: "#8B0000"
+          });
+          generalSignatureRef.current.addEventListener("endStroke", () => {
+            handleEndSignature('general');
+          });
+        }
+        resizeCanvas(generalCanvasRef.current, generalSignatureRef);
+      }
+    };
+
+    // Small timeout to ensure layout has settled
+    const timer = setTimeout(initPad, 100);
+    window.addEventListener("resize", initPad);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", initPad);
+      if (ivSignatureRef.current) {
+        ivSignatureRef.current.off();
+        ivSignatureRef.current = null;
+      }
+      if (generalSignatureRef.current) {
+        generalSignatureRef.current.off();
+        generalSignatureRef.current = null;
+      }
+    };
+  }, [formType]);
+
+  const handleClearSignature = (type: 'iv' | 'general') => {
+    if (type === 'iv' && ivSignatureRef.current) {
+      ivSignatureRef.current.clear();
+      ivForm.setValue('signature', '', { shouldValidate: true });
+    } else if (type === 'general' && generalSignatureRef.current) {
+      generalSignatureRef.current.clear();
+      generalForm.setValue('signature', '', { shouldValidate: true });
+    }
+    setSubmitError(null);
+  };
+
+  const handleEndSignature = (type: 'iv' | 'general') => {
+    if (type === 'iv' && ivSignatureRef.current) {
+      if (!ivSignatureRef.current.isEmpty()) {
+        ivForm.setValue('signature', ivSignatureRef.current.toDataURL(), { shouldValidate: true });
+      }
+    } else if (type === 'general' && generalSignatureRef.current) {
+      if (!generalSignatureRef.current.isEmpty()) {
+        generalForm.setValue('signature', generalSignatureRef.current.toDataURL(), { shouldValidate: true });
+      }
+    }
+    if (submitError) setSubmitError(null);
   };
 
   const onSubmit = async (data: IVQuestionnaireData | GeneralIntakeData) => {
-    setIsSubmitting(true);
     setSubmitError(null);
+    if (!data.signature) {
+      setSubmitError("Please provide a digital signature.");
+      const signatureEl = document.querySelector('.signature-pad-container');
+      signatureEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Custom validation for medical conditions if "Yes" is selected
+    if (formType === 'iv') {
+      const ivData = data as IVQuestionnaireData;
+      if (ivData.medicalConditions === 'Yes') {
+        const hasSelection = ivData.medicalConditionsSelected && ivData.medicalConditionsSelected.length > 0;
+        const hasOther = ivData.medicalConditionsOther && ivData.medicalConditionsOther.trim().length > 0;
+        
+        if (!hasSelection && !hasOther) {
+          setSubmitError("Please select at least one medical condition or describe your condition in the 'Other' field.");
+          const medicalEl = document.getElementsByName('medicalConditions')[0];
+          medicalEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      }
+    }
+
+    setIsSubmitting(true);
     
     try {
       const questionnaireRef = doc(collection(db, "questionnaires"));
-      await setDoc(questionnaireRef, {
+      const questionnaireData = {
         ...data,
         createdAt: serverTimestamp(),
         formCategory: formType === 'iv' ? 'IV Therapy' : 'General Intake'
-      });
+      };
+      await setDoc(questionnaireRef, questionnaireData);
+
+      // Send email alert
+      try {
+        await fetch("/api/send-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "questionnaire", data: questionnaireData })
+        });
+      } catch (err) {
+        console.error("Notification failed", err);
+      }
       
       setSubmitted(true);
       window.scrollTo(0, 0);
@@ -105,6 +256,50 @@ export default function Questionnaire() {
       handleFirestoreError(error, OperationType.WRITE, "questionnaires");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onInvalid = (errors: any) => {
+    const firstError = Object.keys(errors)[0];
+    
+    if (firstError) {
+      const fieldLabels: Record<string, string> = {
+        fullName: "Full Name",
+        dob: "Date of Birth",
+        phone: "Phone Number",
+        email: "Email Address",
+        emergencyContactName: "Emergency Contact Name",
+        emergencyContactPhone: "Emergency Contact Phone",
+        medicalConditions: "Medical Conditions",
+        medications: "Medications",
+        allergies: "Allergies",
+        adverseReactions: "Adverse Reactions",
+        medicalDevices: "Medical Devices",
+        pregnancy: "Pregnancy",
+        primaryReason: "Primary Reason",
+        symptomsDuration: "Duration of Symptoms",
+        desiredOutcome: "Desired Outcome",
+        smoke: "Smoking Status",
+        alcohol: "Alcohol Consumption",
+        waterIntake: "Daily Water Intake",
+        previousIv: "Previous IV Therapy",
+        consent: "Consent Checkbox",
+        signature: "Signature",
+        date: "Date",
+        idNumber: "Identity/Passport Number",
+        address: "Home Address"
+      };
+      
+      const label = fieldLabels[firstError as keyof typeof fieldLabels] || firstError;
+      setSubmitError(`Missing required field: ${label}. Please complete all marked fields.`);
+      
+      const element = document.getElementsByName(firstError)[0] || document.querySelector(`[name="${firstError}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      setSubmitError("Please complete all required fields marked with * and provide a signature before submitting.");
+      window.scrollTo({ top: 100, behavior: 'smooth' });
     }
   };
 
@@ -196,7 +391,7 @@ export default function Questionnaire() {
       </section>
 
       {formType === 'iv' ? (
-        <form onSubmit={ivForm.handleSubmit(onSubmit)} className="max-w-4xl mx-auto px-4 space-y-12">
+        <form onSubmit={ivForm.handleSubmit(onSubmit, onInvalid)} className="max-w-4xl mx-auto px-4 space-y-12">
           {/* IV FORM CONTENT */}
           <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-sm border border-gray-100">
             <div className="flex items-center gap-4 mb-10">
@@ -208,9 +403,8 @@ export default function Questionnaire() {
               <FormField label="Date of Birth *" type="date" register={ivForm.register("dob", { required: true })} error={ivForm.formState.errors.dob} />
               <FormField label="Phone *" register={ivForm.register("phone", { required: true })} error={ivForm.formState.errors.phone} />
               <FormField label="Email *" type="email" register={ivForm.register("email", { required: true })} error={ivForm.formState.errors.email} />
-              <div className="md:col-span-2">
-                <FormField label="Emergency Contact (Name/Phone) *" register={ivForm.register("emergencyContact", { required: true })} error={ivForm.formState.errors.emergencyContact} />
-              </div>
+              <FormField label="Emergency Contact Name *" register={ivForm.register("emergencyContactName", { required: true })} error={ivForm.formState.errors.emergencyContactName} />
+              <FormField label="Emergency Contact Phone *" register={ivForm.register("emergencyContactPhone", { required: true })} error={ivForm.formState.errors.emergencyContactPhone} />
             </div>
           </div>
 
@@ -220,11 +414,29 @@ export default function Questionnaire() {
               <h2 className="text-2xl font-serif">2. Medical History & Screening</h2>
             </div>
             <div className="space-y-12">
-              <RadioGroup label="Do you have any existing medical conditions? *" name="medicalConditions" register={ivForm.register("medicalConditions", { required: true })} watchValue={watchIV.medicalConditions} />
-              {watchIV.medicalConditions === "Yes" && <TextAreaField label="Please list medical conditions" register={ivForm.register("conditionsList")} />}
-              <RadioGroup label="Are you currently taking any medications? *" name="medications" register={ivForm.register("medications", { required: true })} watchValue={watchIV.medications} />
+              <RadioGroup label="Do you have any existing medical conditions? *" name="medicalConditions" register={ivForm.register("medicalConditions", { required: true })} watchValue={watchIV.medicalConditions} error={ivForm.formState.errors.medicalConditions} />
+              {watchIV.medicalConditions === "Yes" && (
+                <div className="space-y-6 pt-4 border-t border-gray-100 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <p className="text-sm font-bold text-gray-700">Please select applicable conditions:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {MEDICAL_CONDITIONS_OPTIONS.map(condition => (
+                      <label key={condition} className="flex items-center gap-3 p-4 bg-brand-grey/50 rounded-2xl cursor-pointer hover:bg-brand-grey transition-colors">
+                        <input 
+                          type="checkbox" 
+                          value={condition}
+                          {...ivForm.register("medicalConditionsSelected")}
+                          className="w-5 h-5 rounded border-gray-300 text-brand-red focus:ring-brand-red"
+                        />
+                        <span className="text-gray-700 font-medium">{condition}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <TextAreaField label="Other existing condition(s) not listed above" register={ivForm.register("medicalConditionsOther")} />
+                </div>
+              )}
+              <RadioGroup label="Are you currently taking any medications? *" name="medications" register={ivForm.register("medications", { required: true })} watchValue={watchIV.medications} error={ivForm.formState.errors.medications} />
               {watchIV.medications === "Yes" && <TextAreaField label="Please list medications" register={ivForm.register("medicationsList")} />}
-              <RadioGroup label="Do you have any allergies? *" name="allergies" register={ivForm.register("allergies", { required: true })} watchValue={watchIV.allergies} />
+              <RadioGroup label="Do you have any allergies? *" name="allergies" register={ivForm.register("allergies", { required: true })} watchValue={watchIV.allergies} error={ivForm.formState.errors.allergies} />
               {watchIV.allergies === "Yes" && <TextAreaField label="Please list allergies" register={ivForm.register("allergiesList")} />}
             </div>
           </div>
@@ -235,9 +447,9 @@ export default function Questionnaire() {
               <h2 className="text-2xl font-serif">3. Medical Devices & Pregnancy</h2>
             </div>
             <div className="space-y-12">
-              <RadioGroup label="Are you implanted with any medical devices? *" name="medicalDevices" register={ivForm.register("medicalDevices", { required: true })} watchValue={watchIV.medicalDevices} />
+              <RadioGroup label="Are you implanted with any medical devices? *" name="medicalDevices" register={ivForm.register("medicalDevices", { required: true })} watchValue={watchIV.medicalDevices} error={ivForm.formState.errors.medicalDevices} />
               {watchIV.medicalDevices === "Yes" && <TextAreaField label="Please list devices" register={ivForm.register("devicesList")} />}
-              <RadioGroup label="Are you pregnant or attempting to conceive? *" name="pregnancy" register={ivForm.register("pregnancy", { required: true })} watchValue={watchIV.pregnancy} />
+              <RadioGroup label="Are you pregnant or attempting to conceive? *" name="pregnancy" register={ivForm.register("pregnancy", { required: true })} watchValue={watchIV.pregnancy} error={ivForm.formState.errors.pregnancy} />
               {watchIV.pregnancy === "Yes" && <FormField label="Conception Date" type="date" register={ivForm.register("conceptionDate")} />}
             </div>
           </div>
@@ -260,10 +472,10 @@ export default function Questionnaire() {
               <h2 className="text-2xl font-serif">5. Lifestyle</h2>
             </div>
             <div className="space-y-8">
-              <RadioGroup label="Do you smoke? *" name="smoke" register={ivForm.register("smoke", { required: true })} watchValue={watchIV.smoke} />
+              <RadioGroup label="Do you smoke? *" name="smoke" register={ivForm.register("smoke", { required: true })} watchValue={watchIV.smoke} error={ivForm.formState.errors.smoke} />
               <TextAreaField label="Alcohol consumption frequency? *" register={ivForm.register("alcohol", { required: true })} />
               <TextAreaField label="Daily water intake (Litres)? *" register={ivForm.register("waterIntake", { required: true })} />
-              <RadioGroup label="Previous IV therapy? *" name="previousIv" register={ivForm.register("previousIv", { required: true })} />
+              <RadioGroup label="Previous IV therapy? *" name="previousIv" register={ivForm.register("previousIv", { required: true })} watchValue={watchIV.previousIv} error={ivForm.formState.errors.previousIv} />
             </div>
           </div>
 
@@ -280,8 +492,34 @@ export default function Questionnaire() {
                 <input type="checkbox" {...ivForm.register("consent", { required: true })} className="w-6 h-6 rounded border-gray-300 text-brand-red focus:ring-brand-red" />
                 <label className="text-sm font-bold text-gray-900">I Consent and Agree</label>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <FormField label="Digital Signature *" register={ivForm.register("signature", { required: true })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-sm font-bold text-gray-700">Digital Signature *</label>
+                    <button 
+                      type="button" 
+                      onClick={() => handleClearSignature('iv')}
+                      className="text-xs text-gray-400 hover:text-brand-red flex items-center gap-1 transition-colors"
+                    >
+                      <Eraser className="w-3 h-3" /> Clear
+                    </button>
+                  </div>
+                  <div className="bg-brand-grey rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden relative group signature-pad-container">
+                    <canvas 
+                      ref={ivCanvasRef}
+                      className="w-full h-40 cursor-crosshair bg-brand-grey"
+                      style={{ touchAction: 'none' }}
+                    />
+                    {!ivForm.watch('signature') && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity">
+                        <p className="text-gray-400 text-sm flex items-center gap-2">
+                          <PenTool className="w-4 h-4" /> Sign Here
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <input type="hidden" {...ivForm.register("signature", { required: true })} />
+                </div>
                 <FormField label="Date *" type="date" register={ivForm.register("date", { required: true })} />
               </div>
             </div>
@@ -292,7 +530,7 @@ export default function Questionnaire() {
           </button>
         </form>
       ) : (
-        <form onSubmit={generalForm.handleSubmit(onSubmit)} className="max-w-4xl mx-auto px-4 space-y-12">
+        <form onSubmit={generalForm.handleSubmit(onSubmit, onInvalid)} className="max-w-4xl mx-auto px-4 space-y-12">
           {/* GENERAL CLINIC INTAKE FORM */}
           <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-sm border border-gray-100">
             <div className="flex items-center gap-4 mb-10">
@@ -338,8 +576,34 @@ export default function Questionnaire() {
                 <input type="checkbox" {...generalForm.register("consent", { required: true })} className="w-6 h-6 rounded border-gray-300 text-brand-red focus:ring-brand-red" />
                 <label className="text-sm font-bold text-gray-900">I Agree to the Clinical Privacy Policy</label>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <FormField label="Full Name (Signature) *" register={generalForm.register("signature", { required: true })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-sm font-bold text-gray-700">Digital Signature *</label>
+                    <button 
+                      type="button" 
+                      onClick={() => handleClearSignature('general')}
+                      className="text-xs text-gray-400 hover:text-brand-red flex items-center gap-1 transition-colors"
+                    >
+                      <Eraser className="w-3 h-3" /> Clear
+                    </button>
+                  </div>
+                  <div className="bg-brand-grey rounded-3xl border-2 border-dashed border-gray-200 overflow-hidden relative group signature-pad-container">
+                    <canvas 
+                      ref={generalCanvasRef}
+                      className="w-full h-40 cursor-crosshair bg-brand-grey"
+                      style={{ touchAction: 'none' }}
+                    />
+                    {!generalForm.watch('signature') && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity">
+                        <p className="text-gray-400 text-sm flex items-center gap-2">
+                          <PenTool className="w-4 h-4" /> Sign Here
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <input type="hidden" {...generalForm.register("signature", { required: true })} />
+                </div>
                 <FormField label="Date *" type="date" register={generalForm.register("date", { required: true })} />
               </div>
             </div>
@@ -395,7 +659,7 @@ function TextAreaField({ label, register, error }: any) {
   );
 }
 
-function RadioGroup({ label, name, register, watchValue }: any) {
+function RadioGroup({ label, name, register, watchValue, error }: any) {
   return (
     <div className="space-y-4">
       <label className="text-sm font-bold text-gray-700 ml-1 block leading-relaxed">{label}</label>
@@ -404,13 +668,15 @@ function RadioGroup({ label, name, register, watchValue }: any) {
           <label key={option} className="flex items-center gap-3 cursor-pointer group">
             <input 
               type="radio" 
+              name={name}
               value={option}
               {...register}
               className="hidden"
             />
             <div className={cn(
               "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-              watchValue === option ? "border-brand-red bg-brand-red text-white" : "border-gray-200 group-hover:border-brand-red"
+              watchValue === option ? "border-brand-red bg-brand-red text-white" : "border-gray-200 group-hover:border-brand-red",
+              error ? "border-red-300 ring-2 ring-red-100" : ""
             )}>
               {watchValue === option && <div className="w-2 h-2 rounded-full bg-white" />}
             </div>
@@ -421,6 +687,7 @@ function RadioGroup({ label, name, register, watchValue }: any) {
           </label>
         ))}
       </div>
+      {error && <p className="text-xs text-red-500 ml-1 font-bold">This field is required</p>}
     </div>
   );
 }

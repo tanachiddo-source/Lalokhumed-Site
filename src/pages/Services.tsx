@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Clock, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { SEO } from "../components/Layout";
 
 export default function Services() {
   const services = [
@@ -62,6 +63,10 @@ export default function Services() {
 
   return (
     <div className="pt-20">
+      <SEO 
+        title="IV Therapy Services & Pricing | LALOKHUMED Sandton" 
+        description="Explore our range of medical IV drips including Immune Boosters, NAD+ Therapy, Detox, and Weight Loss. Professional healthcare in Bryanston."
+      />
       {/* Header */}
       <section className="py-24 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">

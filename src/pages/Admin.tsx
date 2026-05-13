@@ -77,6 +77,8 @@ export default function Admin() {
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [activeTab, setActiveTab] = useState<'bookings' | 'questionnaires'>('bookings');
   const [searchTerm, setSearchTerm] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [selectedItem, setSelectedItem] = useState<Booking | Questionnaire | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   
@@ -232,7 +234,7 @@ export default function Admin() {
   };
 
   const exportToCSV = () => {
-    const data = activeTab === 'bookings' ? bookings : questionnaires;
+    const data = filteredData;
     if (data.length === 0) return;
 
     const headers = Object.keys(data[0]).filter(k => k !== 'createdAt');
@@ -256,11 +258,49 @@ export default function Admin() {
     document.body.removeChild(link);
   };
 
-  const filteredData = (activeTab === 'bookings' ? bookings : questionnaires).filter(item => 
-    item.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.phone.includes(searchTerm)
-  );
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'N/A';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleString('en-ZA', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setFromDate("");
+    setToDate("");
+  };
+
+  const filteredData = (activeTab === 'bookings' ? bookings : questionnaires).filter(item => {
+    const matchesSearch = item.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.phone.includes(searchTerm);
+    
+    if (!matchesSearch) return false;
+
+    if (fromDate || toDate) {
+      const itemDate = item.createdAt.toDate();
+      
+      if (fromDate) {
+        const from = new Date(fromDate);
+        from.setHours(0, 0, 0, 0);
+        if (itemDate < from) return false;
+      }
+      
+      if (toDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        if (itemDate > to) return false;
+      }
+    }
+
+    return true;
+  });
 
   if (loading) {
     return (
@@ -346,12 +386,12 @@ export default function Admin() {
         </div>
 
         {/* Stats & Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <div className="flex gap-2">
+        <div className="flex flex-col lg:flex-row gap-6 mb-8 items-end">
+          <div className="grid grid-cols-2 gap-2 w-full lg:w-[400px] shrink-0">
             <button 
               onClick={() => setActiveTab('bookings')}
               className={cn(
-                "flex-1 px-6 py-4 rounded-3xl font-bold transition-all flex items-center justify-center gap-3 shadow-sm border",
+                "px-6 py-4 rounded-3xl font-bold transition-all flex items-center justify-center gap-3 shadow-sm border",
                 activeTab === 'bookings' 
                   ? "bg-white border-brand-red text-brand-red ring-4 ring-brand-red/5" 
                   : "bg-white border-gray-100 text-gray-400 hover:border-gray-200"
@@ -369,19 +409,57 @@ export default function Admin() {
                   : "bg-white border-gray-100 text-gray-400 hover:border-gray-200"
               )}
             >
-              <Users className="w-5 h-5" /> Questionnaires
+              <Users className="w-5 h-5" /> Forms
               <span className="ml-auto bg-gray-100 px-2.5 py-0.5 rounded-full text-xs font-mono">{questionnaires.length}</span>
             </button>
           </div>
-          <div className="relative">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search by name, email or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-100 rounded-3xl p-4 pl-14 outline-none focus:ring-4 focus:ring-brand-red/5 focus:border-brand-red transition-all shadow-sm"
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow w-full">
+            <div className="relative group">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-2 block">Patient Search</label>
+              <div className="relative">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Name, email or phone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-white border border-gray-100 rounded-2xl p-3.5 pl-12 outline-none focus:ring-4 focus:ring-brand-red/5 focus:border-brand-red transition-all shadow-sm text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:col-span-2">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-2 block">From Date</label>
+                <input 
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full bg-white border border-gray-100 rounded-2xl p-3.5 outline-none focus:ring-4 focus:ring-brand-red/5 focus:border-brand-red transition-all shadow-sm text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 ml-2 block">To Date</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="flex-grow bg-white border border-gray-100 rounded-2xl p-3.5 outline-none focus:ring-4 focus:ring-brand-red/5 focus:border-brand-red transition-all shadow-sm text-sm"
+                  />
+                  {(searchTerm || fromDate || toDate) && (
+                    <button 
+                      onClick={resetFilters}
+                      className="bg-gray-100 text-gray-500 hover:text-brand-red p-3.5 rounded-2xl transition-all shadow-sm flex items-center justify-center shrink-0"
+                      title="Clear Filters"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -396,6 +474,7 @@ export default function Admin() {
                   <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                     {activeTab === 'bookings' ? 'Preferred Slot' : 'Form Type'}
                   </th>
+                  <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Submitted</th>
                   <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status / Action</th>
                   <th className="px-8 py-5"></th>
                 </tr>
@@ -427,6 +506,9 @@ export default function Admin() {
                       )}
                     </td>
                     <td className="px-8 py-6">
+                      <p className="text-xs font-medium text-gray-600">{formatDate(item.createdAt)}</p>
+                    </td>
+                    <td className="px-8 py-6">
                       {activeTab === 'bookings' ? (
                         <div className="flex items-center gap-2">
                           <span className={cn(
@@ -456,7 +538,7 @@ export default function Admin() {
                 ))}
                 {filteredData.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-8 py-20 text-center">
+                    <td colSpan={6} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-3 opacity-30">
                         <Search className="w-12 h-12" />
                         <p className="text-xl font-medium">No results found</p>
@@ -494,6 +576,7 @@ export default function Admin() {
                         {selectedItem.email} • {selectedItem.phone}
                         {selectedItem.dob && <span className="ml-2 pl-2 border-l border-gray-200">DOB: {selectedItem.dob}</span>}
                       </p>
+                      <p className="text-[10px] font-bold text-brand-red uppercase tracking-widest mt-2">Submitted: {formatDate(selectedItem.createdAt)}</p>
                     </div>
                     {activeTab === 'bookings' && (
                       <div className="flex flex-wrap gap-2">
@@ -582,20 +665,59 @@ export default function Admin() {
                                 <AlertCircle className="w-4 h-4 text-brand-red" /> Medical Background
                               </h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div className="md:col-span-2">
+                                  <p className="text-xs text-gray-400">Emergency Contact:</p>
+                                  <p className="font-medium">{(selectedItem as Questionnaire).emergencyContactName} ({(selectedItem as Questionnaire).emergencyContactPhone})</p>
+                                </div>
                                 <div>
                                   <p className="text-xs text-gray-400">Conditions:</p>
-                                  <p>{(selectedItem as Questionnaire).medicalConditions === 'Yes' || (selectedItem as Questionnaire).medicalConditions === 'yes' ? (selectedItem as Questionnaire).conditionsList : 'None Reported'}</p>
+                                  <p>
+                                    {(selectedItem as Questionnaire).medicalConditions === 'Yes' ? (
+                                      <>
+                                        {(selectedItem as Questionnaire).medicalConditionsSelected?.join(", ")}
+                                        {(selectedItem as Questionnaire).medicalConditionsOther && (
+                                          <span className="block mt-1 italic text-gray-400 font-normal">
+                                            Others: {(selectedItem as Questionnaire).medicalConditionsOther}
+                                          </span>
+                                        )}
+                                      </>
+                                    ) : 'None Reported'}
+                                  </p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-gray-400">Medications:</p>
-                                  <p>{(selectedItem as Questionnaire).medications === 'Yes' || (selectedItem as Questionnaire).medications === 'yes' ? (selectedItem as Questionnaire).medicationsList : 'None Reported'}</p>
+                                  <p>{(selectedItem as Questionnaire).medications === 'Yes' ? (selectedItem as Questionnaire).medicationsList : 'None Reported'}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-gray-400">Allergies:</p>
-                                  <p>{(selectedItem as Questionnaire).allergies === 'Yes' || (selectedItem as Questionnaire).allergies === 'yes' ? (selectedItem as Questionnaire).allergiesList : 'None Reported'}</p>
+                                  <p>{(selectedItem as Questionnaire).allergies === 'Yes' ? (selectedItem as Questionnaire).allergiesList : 'None Reported'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-xs text-gray-400">Previous IV Therapy:</p>
+                                  <p className="text-xs text-gray-400">Pregnancy:</p>
+                                  <p>{(selectedItem as Questionnaire).pregnancy === 'Yes' ? `Yes (Date: ${(selectedItem as Questionnaire).conceptionDate})` : 'No'}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-6 bg-brand-grey/50 rounded-[2rem] space-y-4">
+                              <h4 className="font-bold text-sm border-b border-gray-200 pb-2 flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-brand-red" /> Lifestyle & Goals
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-xs text-gray-400">Smoking:</p>
+                                  <p>{(selectedItem as Questionnaire).smoke}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-400">Alcohol:</p>
+                                  <p>{(selectedItem as Questionnaire).alcohol}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-400">Daily Water:</p>
+                                  <p>{(selectedItem as Questionnaire).waterIntake}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-400">Previous IV:</p>
                                   <p>{(selectedItem as Questionnaire).previousIv}</p>
                                 </div>
                               </div>
@@ -609,10 +731,17 @@ export default function Admin() {
                           </>
                         )}
 
-                        <div className="flex items-center gap-4 p-6 border border-gray-100 rounded-3xl">
+                        <div className="flex items-center gap-4 p-6 border border-gray-100 rounded-3xl mt-6">
                           <div className="flex-1">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Digital Signature</p>
-                            <p className="font-serif italic text-lg opacity-80">{(selectedItem as Questionnaire).signature}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Digital Signature</p>
+                            <div className="bg-brand-grey/50 rounded-xl p-4 border border-gray-100">
+                              <img 
+                                src={(selectedItem as Questionnaire).signature} 
+                                alt="Signature" 
+                                className="max-h-24 mix-blend-multiply h-auto mx-auto"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
                           </div>
                           <div className="text-right">
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Consent Given</p>

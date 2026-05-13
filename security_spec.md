@@ -5,7 +5,7 @@
 2. **Questionnaires**: Must have fullName, email, phone, and signature. Once created, they are immutable (clinical records).
 3. **Availability**: Links a booking ID to a taken slot. Only admins can manage this.
 4. **Notifications**: Queue for communication. Only admins can create/list.
-5. **Admins**: Trusted list of UIDs. Fallback to `tanachiddo@gmail.com`.
+5. **Admins**: Trusted list of UIDs or the primary Business Admin Email (defined in environment variables).
 
 ## The Dirty Dozen Payloads
 1. **Unauthenticated Booking**: Create booking without auth. (ALLOWED - public)

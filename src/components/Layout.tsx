@@ -1,12 +1,91 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { motion } from "motion/react";
-import { Menu, X, Phone, Mail, Instagram, Facebook, ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { Menu, X, Phone, Mail, ShieldCheck, ChevronRight, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/src/lib/utils";
 import { auth, db } from "@/src/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { Helmet } from "react-helmet-async";
+
+interface SEOProps {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  type?: 'website' | 'article' | 'business';
+}
+
+export function SEO({ 
+  title = "LALOKHUMED | IV Therapy & Wellness Sandton", 
+  description = "Premium doctor-led IV therapy practice in Bryanston, Sandton. Personalised medical treatments curated to restore your vitality in a serene clinical environment.",
+  canonical,
+  type = 'website'
+}: SEOProps) {
+  const location = useLocation();
+  const url = canonical || `https://lalokhumed.co.za${location.pathname}`;
+  
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "MedicalBusiness",
+    "name": "LALOKHUMED",
+    "image": "https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png",
+    "@id": "https://lalokhumed.co.za",
+    "url": "https://lalokhumed.co.za",
+    "telephone": "+27678853687",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "273 Bryanston Drive, Bryanston",
+      "addressLocality": "Sandton, Johannesburg",
+      "postalCode": "2191",
+      "addressCountry": "ZA"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": -26.0594,
+      "longitude": 28.0244
+    },
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "opens": "08:00",
+        "closes": "17:00"
+      },
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": "Saturday",
+        "opens": "09:00",
+        "closes": "13:00"
+      }
+    ],
+    "sameAs": []
+  };
+
+  return (
+    <Helmet>
+      <title>{title}</title>
+      <meta name="description" content={description} />
+      <link rel="canonical" href={url} />
+      
+      {/* Open Graph */}
+      <meta property="og:title" content={title} />
+      <meta property="og:description" content={description} />
+      <meta property="og:url" content={url} />
+      <meta property="og:type" content={type === 'article' ? 'article' : 'website'} />
+      <meta property="og:site_name" content="LALOKHUMED" />
+      
+      {/* Twitter */}
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={title} />
+      <meta name="twitter:description" content={description} />
+
+      <script type="application/ld+json">
+        {JSON.stringify(structuredData)}
+      </script>
+    </Helmet>
+  );
+}
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,7 +99,8 @@ export function Navbar() {
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (user.email === 'tanachiddo@gmail.com') {
+        const adminEmail = (import.meta as any).env.VITE_ADMIN_EMAIL || 'tanachiddo@gmail.com';
+        if (user.email === adminEmail) {
           setIsAdmin(true);
           return;
         }
@@ -58,13 +138,14 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex justify-between items-center">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-full bg-brand-red flex items-center justify-center text-white font-serif text-xl border-2 border-white shadow-sm group-hover:scale-105 transition-transform font-bold">
-              L
-            </div>
-            <div className="flex flex-col -gap-1">
-              <span className="text-xl font-serif font-bold tracking-tight text-brand-text">LALOKHUMED</span>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-medium">Medical Practice</span>
+          <Link to="/" className="flex items-center group">
+            <div className="h-12 md:h-16 group-hover:scale-105 transition-transform duration-300">
+              <img 
+                src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png" 
+                alt="Lalokhumed Logo" 
+                className="h-full w-auto object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
           </Link>
 
@@ -163,7 +244,8 @@ export function Footer() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (user.email === 'tanachiddo@gmail.com') {
+        const adminEmail = (import.meta as any).env.VITE_ADMIN_EMAIL || 'tanachiddo@gmail.com';
+        if (user.email === adminEmail) {
           setIsAdmin(true);
           return;
         }
@@ -186,20 +268,20 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           <div className="col-span-1 md:col-span-1">
-             <Link to="/" className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 rounded-full bg-brand-red flex items-center justify-center text-white font-serif text-xl font-bold">L</div>
-                <span className="text-xl font-serif font-bold tracking-tight">LALOKHUMED</span>
+             <Link to="/" className="flex items-center group mb-6">
+                <div className="h-16 group-hover:scale-105 transition-transform duration-300">
+                  <img 
+                    src="https://raw.githubusercontent.com/tanachiddo-source/Lalokhumed-Site/2371694bb5b30357f3167079d764c51b94bc167c/Logo_3-removebg-preview.png" 
+                    alt="Lalokhumed Logo" 
+                    className="h-full w-auto object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
              </Link>
              <p className="text-gray-500 text-sm leading-relaxed mb-6">
                Premium, doctor-led IV therapy practice in the heart of Sandton. Dedicated to your long-term wellness and vitality.
              </p>
              <div className="flex gap-4">
-               <a href="#" className="w-8 h-8 rounded-full bg-brand-grey flex items-center justify-center text-gray-400 hover:text-brand-red transition-all duration-300 transform">
-                 <Instagram className="w-4 h-4" />
-               </a>
-               <a href="#" className="w-8 h-8 rounded-full bg-brand-grey flex items-center justify-center text-gray-400 hover:text-brand-red transition-all duration-300 transform">
-                 <Facebook className="w-4 h-4" />
-               </a>
              </div>
              {isAdmin && (
                <motion.div 
@@ -240,7 +322,6 @@ export function Footer() {
               <li className="flex items-start gap-3">
                 <Phone className="w-4 h-4 text-brand-red mt-0.5" />
                 <div className="text-gray-500 text-sm flex flex-col gap-1">
-                  <a href="tel:+27872559066" className="hover:text-brand-red transition-colors">+27 872 559 066</a>
                   <a href="tel:+27678853687" className="hover:text-brand-red transition-colors">+27 678 853 687</a>
                 </div>
               </li>
@@ -278,9 +359,14 @@ export function Footer() {
         </div>
 
         <div className="pt-10 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-gray-400 text-xs">
-            © {new Date().getFullYear()} LALOKHUMED PTY LTD. All rights reserved.
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-gray-400 text-xs">
+              © {new Date().getFullYear()} LALOKHUMED PTY LTD. All rights reserved.
+            </p>
+            <p className="text-gray-300 text-[10px] uppercase tracking-tighter">
+              Website by TGS
+            </p>
+          </div>
           <div className="flex gap-6">
             <Link to="/privacy-policy" className="text-gray-400 text-xs hover:text-gray-600">Privacy Policy</Link>
             <Link to="/terms-of-service" className="text-gray-400 text-xs hover:text-gray-600">Terms of Service</Link>
@@ -292,24 +378,76 @@ export function Footer() {
 }
 
 export function StickyCTA() {
+  const [isVisible, setIsVisible] = useState(() => {
+    const saved = localStorage.getItem('sticky-cta-visible');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleVisibility = () => {
+    const newState = !isVisible;
+    setIsVisible(newState);
+    localStorage.setItem('sticky-cta-visible', JSON.stringify(newState));
+  };
+
   return (
     <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
-       <a 
-        href="https://wa.me/27678853687" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="pointer-events-auto bg-green-500 text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-transform active:scale-95 flex items-center justify-center"
-      >
-        <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
-          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.589.943 3.385 1.44 5.577 1.44 5.461 0 9.905-4.444 9.908-9.906.002-2.646-1.027-5.133-2.9-7.008-1.871-1.873-4.359-2.903-7.005-2.904-5.46 0-9.903 4.443-9.907 9.906 0 2.128.554 4.197 1.603 6.012l-.993 3.623 3.717-.963zm10.867-7.151c-.3-.15-1.77-.874-2.046-.976-.276-.102-.476-.15-.676.15-.2.3-.77.976-.944 1.176-.174.199-.348.225-.648.075-.3-.15-1.266-.467-2.41-1.486-.89-.794-1.49-1.775-1.666-2.075-.176-.3-.019-.462.131-.611.135-.134.3-.349.45-.525.151-.176.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.629-.926-2.228-.243-.584-.489-.505-.676-.514-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.376-.275.301-1.05 1.026-1.05 2.502 0 1.475 1.075 2.901 1.225 3.101.15.199 2.114 3.227 5.122 4.526.715.309 1.273.493 1.708.633.72.227 1.373.196 1.89.119.578-.085 1.77-.723 2.021-1.424.25-.699.25-1.299.175-1.424-.075-.125-.275-.199-.575-.349z"/>
-        </svg>
-      </a>
-      <Link 
-        to="/booking" 
-        className="pointer-events-auto bg-brand-red text-white py-4 px-8 rounded-full shadow-2xl hover:bg-brand-red-dark transition-all hover:-translate-y-1 active:scale-95 font-medium flex items-center gap-2"
-      >
-        Book Now
-      </Link>
+       <AnimatePresence>
+         {isVisible && (
+           <motion.div
+             initial={{ opacity: 0, y: 20, scale: 0.9 }}
+             animate={{ opacity: 1, y: 0, scale: 1 }}
+             exit={{ opacity: 0, y: 20, scale: 0.9 }}
+             className="flex flex-col items-end gap-3 pointer-events-none"
+           >
+             <div className="flex items-center gap-2 mb-1">
+               <button 
+                 onClick={toggleVisibility}
+                 className="pointer-events-auto bg-white/80 backdrop-blur-sm border border-gray-100 text-gray-400 hover:text-gray-600 p-1 rounded-full shadow-sm transition-colors active:scale-95"
+                 title="Hide buttons"
+               >
+                 <ChevronRight className="w-4 h-4" />
+               </button>
+             </div>
+             
+             <a 
+              href="https://wa.me/27678853687" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="pointer-events-auto bg-green-500 text-white p-3 rounded-full shadow-2xl hover:scale-110 transition-transform active:scale-95 flex items-center justify-center group relative"
+            >
+              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.484 8.412-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.309 1.656zm6.29-4.143c1.589.943 3.385 1.44 5.577 1.44 5.461 0 9.905-4.444 9.908-9.906.002-2.646-1.027-5.133-2.9-7.008-1.871-1.873-4.359-2.903-7.005-2.904-5.46 0-9.903 4.443-9.907 9.906 0 2.128.554 4.197 1.603 6.012l-.993 3.623 3.717-.963zm10.867-7.151c-.3-.15-1.77-.874-2.046-.976-.276-.102-.476-.15-.676.15-.2.3-.77.976-.944 1.176-.174.199-.348.225-.648.075-.3-.15-1.266-.467-2.41-1.486-.89-.794-1.49-1.775-1.666-2.075-.176-.3-.019-.462.131-.611.135-.134.3-.349.45-.525.151-.176.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.629-.926-2.228-.243-.584-.489-.505-.676-.514-.175-.008-.375-.01-.575-.01-.2 0-.525.075-.8.376-.275.301-1.05 1.026-1.05 2.502 0 1.475 1.075 2.901 1.225 3.101.15.199 2.114 3.227 5.122 4.526.715.309 1.273.493 1.708.633.72.227 1.373.196 1.89.119.578-.085 1.77-.723 2.021-1.424.25-.699.25-1.299.175-1.424-.075-.125-.275-.199-.575-.349z"/>
+              </svg>
+              <span className="absolute right-full mr-3 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap top-1/2 -translate-y-1/2 uppercase tracking-widest hidden md:block">WhatsApp</span>
+            </a>
+            
+            <Link 
+              to="/booking" 
+              className="pointer-events-auto bg-brand-red text-white py-4 px-8 rounded-full shadow-2xl hover:bg-brand-red-dark transition-all hover:-translate-y-1 active:scale-95 font-medium flex items-center gap-2"
+            >
+              Book Now
+            </Link>
+          </motion.div>
+         )}
+       </AnimatePresence>
+
+       {/* Reveal Button */}
+       {!isVisible && (
+         <motion.button
+           initial={{ opacity: 0, x: 20 }}
+           animate={{ opacity: 1, x: 0 }}
+           whileHover={{ scale: 1.1 }}
+           whileTap={{ scale: 0.9 }}
+           onClick={toggleVisibility}
+           className="pointer-events-auto bg-brand-red/90 backdrop-blur-sm text-white p-3 rounded-full shadow-xl flex items-center justify-center group"
+           title="Show book options"
+         >
+           <MessageCircle className="w-5 h-5" />
+           <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 group-hover:ml-2 whitespace-nowrap text-xs font-medium uppercase tracking-widest">
+             Book Now
+           </span>
+         </motion.button>
+       )}
     </div>
   );
 }
